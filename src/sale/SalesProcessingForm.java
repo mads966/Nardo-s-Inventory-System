@@ -32,6 +32,7 @@ public class SalesProcessingForm extends JPanel {
     private JLabel taxLabel;
     private JLabel discountLabel;
     private JLabel totalLabel;
+    private JLabel itemsCountLabel;
     
     private JComboBox<String> paymentMethodCombo;
     private JTextField discountField;
@@ -55,19 +56,50 @@ public class SalesProcessingForm extends JPanel {
         this.productService = new ProductService(connection);
         this.currentSale = Sale.createNewSale(userId, userName);
         
+        // Set properties for immediate visibility
+        setOpaque(true);
+        setBackground(Color.WHITE);
+        setDoubleBuffered(true); // Enable double buffering
+
         initComponents();
         layoutComponents();
         setupListeners();
         loadProducts();
-        
-        // Set keyboard shortcuts
+
         setupKeyboardShortcuts();
+
+        // Force initial state
+        setVisible(true);
+        setEnabled(true);
+
+        // Immediate validation
+        revalidate();
+        repaint();
+
+        // Schedule additional validation
+        SwingUtilities.invokeLater(() -> {
+            revalidate();
+            repaint();
+            if (getParent() != null) {
+                getParent().revalidate();
+                getParent().repaint();
+            }
+        });
     }
     
     private void initComponents() {
         // Product search
         productSearchField = new JTextField(20);
+        productSearchField.setFont(new Font("Arial", Font.PLAIN, 12));
+        productSearchField.setOpaque(true);
+        productSearchField.setBackground(Color.WHITE);
+        
         searchButton = new JButton("Search");
+        searchButton.setFont(new Font("Arial", Font.BOLD, 12));
+        searchButton.setBackground(new Color(33, 150, 243));
+        searchButton.setForeground(Color.WHITE);
+        searchButton.setOpaque(true);
+        searchButton.setBorderPainted(true);
         
         // Products table
         String[] productColumns = {"ID", "Name", "Category", "Price", "Stock"};
@@ -90,13 +122,18 @@ public class SalesProcessingForm extends JPanel {
         productsTable = new JTable(productsModel);
         productsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         productsTable.setRowHeight(25);
+        productsTable.setFont(new Font("Arial", Font.PLAIN, 12));
+        productsTable.setOpaque(true);
+        productsTable.setBackground(Color.WHITE);
+        productsTable.setGridColor(new Color(220, 220, 220));
+        productsTable.setFillsViewportHeight(true);
         
         // Sale items table
         String[] saleColumns = {"ID", "Name", "Qty", "Price", "Total", "Action"};
         saleItemsModel = new DefaultTableModel(saleColumns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 2 || column == 5; // Quantity and Action columns are editable
+                return column == 2 || column == 5;
             }
             
             @Override
@@ -112,54 +149,130 @@ public class SalesProcessingForm extends JPanel {
         };
         saleItemsTable = new JTable(saleItemsModel);
         saleItemsTable.setRowHeight(25);
+        saleItemsTable.setFont(new Font("Arial", Font.PLAIN, 12));
+        saleItemsTable.setOpaque(true);
+        saleItemsTable.setBackground(Color.WHITE);
+        saleItemsTable.setGridColor(new Color(220, 220, 220));
+        saleItemsTable.setFillsViewportHeight(true);
         
         // Quantity spinner
         quantitySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+        quantitySpinner.setFont(new Font("Arial", Font.PLAIN, 12));
+        JSpinner.DefaultEditor editor = (JSpinner.DefaultEditor) quantitySpinner.getEditor();
+        editor.getTextField().setOpaque(true);
+        editor.getTextField().setBackground(Color.WHITE);
         
         // Action buttons
-        addToSaleButton = new JButton("Add to Sale");
-        removeFromSaleButton = new JButton("Remove Selected");
-        clearSaleButton = new JButton("Clear Sale");
+        addToSaleButton = createStyledButton("Add to Sale", new Color(76, 175, 80));
+        removeFromSaleButton = createStyledButton("Remove Selected", new Color(244, 67, 54));
+        clearSaleButton = createStyledButton("Clear Sale", new Color(255, 152, 0));
         
         // Totals display
-        subtotalLabel = new JLabel("$0.00");
-        taxLabel = new JLabel("$0.00");
-        discountLabel = new JLabel("$0.00");
-        totalLabel = new JLabel("$0.00");
-        totalLabel.setFont(new Font("Arial", Font.BOLD, 16));
+        subtotalLabel = createStyledLabel("$0.00");
+        taxLabel = createStyledLabel("$0.00");
+        discountLabel = createStyledLabel("$0.00");
+        totalLabel = createStyledLabel("$0.00");
+        totalLabel.setFont(new Font("Arial", Font.BOLD, 18));
+        totalLabel.setForeground(new Color(33, 150, 243));
+        
+        itemsCountLabel = createStyledLabel("0");
         
         // Payment and discount
         paymentMethodCombo = new JComboBox<>(Sale.PAYMENT_METHODS);
+        paymentMethodCombo.setFont(new Font("Arial", Font.PLAIN, 12));
+        paymentMethodCombo.setOpaque(true);
+        paymentMethodCombo.setBackground(Color.WHITE);
+        
         discountField = new JTextField(10);
-        applyDiscountButton = new JButton("Apply Discount %");
+        discountField.setFont(new Font("Arial", Font.PLAIN, 12));
+        discountField.setOpaque(true);
+        discountField.setBackground(Color.WHITE);
+        
+        applyDiscountButton = createStyledButton("Apply Discount %", new Color(156, 39, 176));
+        
         notesArea = new JTextArea(3, 30);
+        notesArea.setFont(new Font("Arial", Font.PLAIN, 12));
+        notesArea.setLineWrap(true);
+        notesArea.setWrapStyleWord(true);
+        notesArea.setOpaque(true);
+        notesArea.setBackground(Color.WHITE);
         
         // Main action buttons
-        processSaleButton = new JButton("Process Sale");
-        processSaleButton.setBackground(new Color(76, 175, 80));
-        processSaleButton.setForeground(Color.WHITE);
+        processSaleButton = createStyledButton("Process Sale", new Color(76, 175, 80));
         processSaleButton.setFont(new Font("Arial", Font.BOLD, 14));
         
-        printReceiptButton = new JButton("Print Receipt");
-        saveSaleButton = new JButton("Save as Draft");
-        cancelSaleButton = new JButton("Cancel");
+        printReceiptButton = createStyledButton("Print Receipt", new Color(33, 150, 243));
+        saveSaleButton = createStyledButton("Save as Draft", new Color(255, 152, 0));
+        cancelSaleButton = createStyledButton("Cancel", new Color(158, 158, 158));
         
         // Status label
         statusLabel = new JLabel("Ready to process sales");
-        statusLabel.setBorder(BorderFactory.createLoweredBevelBorder());
+        statusLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        statusLabel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLoweredBevelBorder(),
+            BorderFactory.createEmptyBorder(5, 10, 5, 10)
+        ));
+        statusLabel.setBackground(new Color(245, 245, 245));
+        statusLabel.setOpaque(true);
+    }
+    
+    private JButton createStyledButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setBackground(color);
+        button.setForeground(Color.WHITE);
+        button.setFont(new Font("Arial", Font.BOLD, 12));
+        button.setFocusPainted(true);
+        button.setBorderPainted(true);
+        button.setOpaque(true);
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createRaisedBevelBorder(),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
+        ));
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        
+        button.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                button.setBackground(color.darker());
+            }
+            
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent evt) {
+                button.setBackground(color);
+            }
+        });
+        
+        return button;
+    }
+    
+    private JLabel createStyledLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Arial", Font.BOLD, 14));
+        label.setHorizontalAlignment(SwingConstants.RIGHT);
+        label.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        label.setOpaque(true);
+        label.setBackground(Color.WHITE);
+        return label;
     }
     
     private void layoutComponents() {
-        setLayout(new BorderLayout(10, 10));
-        setBorder(new EmptyBorder(10, 10, 10, 10));
+        // Use a main container with proper background
+        setLayout(new BorderLayout(15, 15));
+        setBorder(new EmptyBorder(15, 15, 15, 15));
+        setBackground(Color.WHITE);
         
-        // Top: Product search
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        searchPanel.setBorder(new TitledBorder("Product Search"));
-        searchPanel.add(new JLabel("Search:"));
+        // Top: Product search panel
+        JPanel searchPanel = createWhitePanel();
+        searchPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        searchPanel.setBorder(BorderFactory.createCompoundBorder(
+            new TitledBorder("Product Search"),
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
+        
+        searchPanel.add(createLabel("Search:"));
         searchPanel.add(productSearchField);
         searchPanel.add(searchButton);
-        searchPanel.add(new JLabel("  Quantity:"));
+        searchPanel.add(createLabel("  Quantity:"));
         searchPanel.add(quantitySpinner);
         searchPanel.add(addToSaleButton);
         
@@ -168,25 +281,44 @@ public class SalesProcessingForm extends JPanel {
         // Center: Split pane for products and sale items
         JSplitPane centerSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         centerSplit.setResizeWeight(0.5);
+        centerSplit.setDividerLocation(400);
+        centerSplit.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        centerSplit.setOpaque(true);
+        centerSplit.setBackground(Color.WHITE);
         
         // Products panel
-        JPanel productsPanel = new JPanel(new BorderLayout(5, 5));
-        productsPanel.setBorder(new TitledBorder("Available Products"));
+        JPanel productsPanel = createWhitePanel();
+        productsPanel.setLayout(new BorderLayout(5, 5));
+        productsPanel.setBorder(BorderFactory.createCompoundBorder(
+            new TitledBorder("Available Products"),
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
         
         JScrollPane productsScroll = new JScrollPane(productsTable);
-        productsScroll.setPreferredSize(new Dimension(700, 200));
+        productsScroll.setPreferredSize(new Dimension(800, 300));
+        productsScroll.setMinimumSize(new Dimension(800, 200));
+        productsScroll.setOpaque(true);
+        productsScroll.getViewport().setBackground(Color.WHITE);
         productsPanel.add(productsScroll, BorderLayout.CENTER);
         
         // Sale items panel
-        JPanel salePanel = new JPanel(new BorderLayout(5, 5));
-        salePanel.setBorder(new TitledBorder("Current Sale"));
+        JPanel salePanel = createWhitePanel();
+        salePanel.setLayout(new BorderLayout(5, 5));
+        salePanel.setBorder(BorderFactory.createCompoundBorder(
+            new TitledBorder("Current Sale"),
+            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
         
         JScrollPane saleScroll = new JScrollPane(saleItemsTable);
-        saleScroll.setPreferredSize(new Dimension(700, 200));
+        saleScroll.setPreferredSize(new Dimension(800, 300));
+        saleScroll.setMinimumSize(new Dimension(800, 200));
+        saleScroll.setOpaque(true);
+        saleScroll.getViewport().setBackground(Color.WHITE);
         salePanel.add(saleScroll, BorderLayout.CENTER);
         
         // Sale action buttons
-        JPanel saleActions = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JPanel saleActions = createWhitePanel();
+        saleActions.setLayout(new FlowLayout(FlowLayout.LEFT, 10, 10));
         saleActions.add(removeFromSaleButton);
         saleActions.add(clearSaleButton);
         salePanel.add(saleActions, BorderLayout.SOUTH);
@@ -197,60 +329,137 @@ public class SalesProcessingForm extends JPanel {
         add(centerSplit, BorderLayout.CENTER);
         
         // Right: Totals and payment panel
-        JPanel rightPanel = new JPanel(new BorderLayout());
-        rightPanel.setPreferredSize(new Dimension(300, 0));
+        JPanel rightPanel = createWhitePanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setPreferredSize(new Dimension(350, 0));
+        rightPanel.setBorder(new EmptyBorder(0, 15, 0, 0));
         
         // Totals panel
-        JPanel totalsPanel = new JPanel(new GridLayout(5, 2, 5, 5));
-        totalsPanel.setBorder(new TitledBorder("Sale Totals"));
+        JPanel totalsPanel = createWhitePanel();
+        totalsPanel.setLayout(new GridLayout(6, 2, 10, 10));
+        totalsPanel.setBorder(BorderFactory.createCompoundBorder(
+            new TitledBorder("Sale Totals"),
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        totalsPanel.setMaximumSize(new Dimension(350, 250));
         
-        totalsPanel.add(new JLabel("Subtotal:"));
+        totalsPanel.add(createBoldLabel("Subtotal:"));
         totalsPanel.add(subtotalLabel);
-        totalsPanel.add(new JLabel("Tax (10%):"));
+        totalsPanel.add(createBoldLabel("Tax (10%):"));
         totalsPanel.add(taxLabel);
-        totalsPanel.add(new JLabel("Discount:"));
+        totalsPanel.add(createBoldLabel("Discount:"));
         totalsPanel.add(discountLabel);
-        totalsPanel.add(new JLabel("Total:"));
+        totalsPanel.add(createBoldLabel("Total:"));
         totalsPanel.add(totalLabel);
-        totalsPanel.add(new JLabel("Items:"));
-        totalsPanel.add(new JLabel("0"));
+        totalsPanel.add(createBoldLabel("Items:"));
+        totalsPanel.add(itemsCountLabel);
         
         // Payment panel
-        JPanel paymentPanel = new JPanel(new GridLayout(5, 2, 5, 5));
-        paymentPanel.setBorder(new TitledBorder("Payment"));
+        JPanel paymentPanel = createWhitePanel();
+        paymentPanel.setLayout(new GridBagLayout());
+        paymentPanel.setBorder(BorderFactory.createCompoundBorder(
+            new TitledBorder("Payment"),
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        paymentPanel.setMaximumSize(new Dimension(350, 300));
         
-        paymentPanel.add(new JLabel("Payment Method:"));
-        paymentPanel.add(paymentMethodCombo);
-        paymentPanel.add(new JLabel("Discount (%):"));
-        paymentPanel.add(discountField);
-        paymentPanel.add(new JLabel(""));
-        paymentPanel.add(applyDiscountButton);
-        paymentPanel.add(new JLabel("Notes:"));
-        paymentPanel.add(new JScrollPane(notesArea));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weightx = 1.0;
         
-        // Combine totals and payment
-        JPanel rightContent = new JPanel();
-        rightContent.setLayout(new BoxLayout(rightContent, BoxLayout.Y_AXIS));
-        rightContent.add(totalsPanel);
-        rightContent.add(Box.createVerticalStrut(10));
-        rightContent.add(paymentPanel);
+        // Payment method
+        gbc.gridx = 0; gbc.gridy = 0;
+        paymentPanel.add(createBoldLabel("Payment Method:"), gbc);
         
-        rightPanel.add(rightContent, BorderLayout.NORTH);
+        gbc.gridx = 1; gbc.gridy = 0;
+        paymentPanel.add(paymentMethodCombo, gbc);
         
-        // Main action buttons at bottom of right panel
-        JPanel actionPanel = new JPanel(new GridLayout(4, 1, 5, 5));
-        actionPanel.setBorder(new TitledBorder("Actions"));
+        // Discount
+        gbc.gridx = 0; gbc.gridy = 1;
+        paymentPanel.add(createBoldLabel("Discount (%):"), gbc);
+        
+        gbc.gridx = 1; gbc.gridy = 1;
+        paymentPanel.add(discountField, gbc);
+        
+        // Apply discount button
+        gbc.gridx = 0; gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.fill = GridBagConstraints.NONE;
+        gbc.anchor = GridBagConstraints.CENTER;
+        paymentPanel.add(applyDiscountButton, gbc);
+        
+        // Notes label
+        gbc.gridx = 0; gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        paymentPanel.add(createBoldLabel("Notes:"), gbc);
+        
+        // Notes area
+        gbc.gridx = 0; gbc.gridy = 4;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weighty = 1.0;
+        JScrollPane notesScroll = new JScrollPane(notesArea);
+        notesScroll.setPreferredSize(new Dimension(300, 80));
+        notesScroll.setOpaque(true);
+        notesScroll.getViewport().setBackground(Color.WHITE);
+        paymentPanel.add(notesScroll, gbc);
+        
+        // Main action buttons panel
+        JPanel actionPanel = createWhitePanel();
+        actionPanel.setLayout(new GridLayout(4, 1, 10, 10));
+        actionPanel.setBorder(BorderFactory.createCompoundBorder(
+            new TitledBorder("Actions"),
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        actionPanel.setMaximumSize(new Dimension(350, 250));
+        
         actionPanel.add(processSaleButton);
         actionPanel.add(printReceiptButton);
         actionPanel.add(saveSaleButton);
         actionPanel.add(cancelSaleButton);
         
-        rightPanel.add(actionPanel, BorderLayout.SOUTH);
+        // Add all panels to right panel
+        rightPanel.add(totalsPanel);
+        rightPanel.add(Box.createVerticalStrut(15));
+        rightPanel.add(paymentPanel);
+        rightPanel.add(Box.createVerticalStrut(15));
+        rightPanel.add(actionPanel);
+        rightPanel.add(Box.createVerticalGlue());
         
         add(rightPanel, BorderLayout.EAST);
         
         // Bottom: Status bar
-        add(statusLabel, BorderLayout.SOUTH);
+        JPanel statusPanel = createWhitePanel();
+        statusPanel.setLayout(new BorderLayout());
+        statusPanel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        statusPanel.add(statusLabel, BorderLayout.CENTER);
+        
+        add(statusPanel, BorderLayout.SOUTH);
+    }
+    
+    private JPanel createWhitePanel() {
+        JPanel panel = new JPanel();
+        panel.setOpaque(true);
+        panel.setBackground(Color.WHITE);
+        return panel;
+    }
+    
+    private JLabel createLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Arial", Font.PLAIN, 12));
+        label.setOpaque(true);
+        label.setBackground(Color.WHITE);
+        return label;
+    }
+    
+    private JLabel createBoldLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setFont(new Font("Arial", Font.BOLD, 12));
+        label.setOpaque(true);
+        label.setBackground(Color.WHITE);
+        return label;
     }
     
     private void setupListeners() {
@@ -566,30 +775,11 @@ public class SalesProcessingForm extends JPanel {
         int totalItems = currentSale.getItems().stream()
             .mapToInt(SaleItem::getQuantity)
             .sum();
+        itemsCountLabel.setText(String.valueOf(totalItems));
         
-        // Find the items label (it's the last label in totals panel)
-        Component[] components = getComponents();
-        for (Component comp : components) {
-            if (comp instanceof JPanel) {
-                Component[] subComps = ((JPanel) comp).getComponents();
-                for (Component subComp : subComps) {
-                    if (subComp instanceof JPanel) {
-                        Component[] innerComps = ((JPanel) subComp).getComponents();
-                        for (int i = 0; i < innerComps.length; i++) {
-                            if (innerComps[i] instanceof JLabel) {
-                                JLabel label = (JLabel) innerComps[i];
-                                if ("Items:".equals(label.getText())) {
-                                    // Next component should be the items count label
-                                    if (i + 1 < innerComps.length && innerComps[i + 1] instanceof JLabel) {
-                                        ((JLabel) innerComps[i + 1]).setText(String.valueOf(totalItems));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // Force UI update
+        revalidate();
+        repaint();
     }
     
     private void applyDiscount() {
@@ -619,7 +809,6 @@ public class SalesProcessingForm extends JPanel {
         }
     }
     
-    // SRS 1.3: Process sale and deduct inventory
     private void processCurrentSale() {
         if (currentSale.getItems().isEmpty()) {
             JOptionPane.showMessageDialog(this,
@@ -832,7 +1021,7 @@ public class SalesProcessingForm extends JPanel {
     }
     
     // Progress dialog for long operations
-    private static class ProgressDialog extends JDialog {
+    private class ProgressDialog extends JDialog {
         private JProgressBar progressBar;
         
         public ProgressDialog(Frame parent, String message) {
@@ -841,13 +1030,20 @@ public class SalesProcessingForm extends JPanel {
             setLayout(new BorderLayout(10, 10));
             setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
             setResizable(false);
+            setOpaque(true);
+            setBackground(Color.WHITE);
             
             JLabel label = new JLabel(message, SwingConstants.CENTER);
+            label.setFont(new Font("Arial", Font.PLAIN, 14));
             label.setBorder(BorderFactory.createEmptyBorder(20, 30, 10, 30));
+            label.setOpaque(true);
+            label.setBackground(Color.WHITE);
             
             progressBar = new JProgressBar();
             progressBar.setIndeterminate(true);
             progressBar.setPreferredSize(new Dimension(300, 20));
+            progressBar.setOpaque(true);
+            progressBar.setBackground(Color.WHITE);
             
             add(label, BorderLayout.CENTER);
             add(progressBar, BorderLayout.SOUTH);

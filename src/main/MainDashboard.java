@@ -12,6 +12,10 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.print.PageFormat;
+import java.awt.print.Printable;
+import java.awt.print.PrinterException;
+import java.awt.print.PrinterJob;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -21,12 +25,19 @@ import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import static java.awt.print.Printable.NO_SUCH_PAGE;
+
+import java.awt.print.*;
+import javax.print.attribute.*;
+import javax.print.attribute.standard.*;
+import java.awt.Graphics2D;
+
 public class MainDashboard extends JFrame {
     // Core components
     private User currentUser;
     private Connection connection;
     private UserManager userManager;
-    
+
     // Services
     private SalesProcessor salesProcessor;
     private ReportGenerator reportGenerator;
@@ -505,7 +516,7 @@ public class MainDashboard extends JFrame {
         });
         inventoryMenu.getItem(4).addActionListener(e -> {
             switchToPanel("INVENTORY");
-            inventoryPanel.manageSuppliers();
+            inventoryPanel.manageSuppliers(connection);
         });
         
         // Reports menu actions
@@ -861,23 +872,106 @@ public class MainDashboard extends JFrame {
         
         updateStatus("About dialog displayed");
     }
-    
+
     private void printCurrentView() {
         String panelName = "Dashboard";
-        Component currentPanel = ((JPanel) mainContentPanel.getComponent(0)).getComponent(0);
-        
-        if (currentPanel == salesPanel) panelName = "Sales";
-        else if (currentPanel == inventoryPanel) panelName = "Inventory";
-        else if (currentPanel == reportPanel) panelName = "Reports";
-        
-        JOptionPane.showMessageDialog(this,
-            "Print " + panelName + " View\n\n" +
-            "Print functionality would be implemented here.",
-            "Print", JOptionPane.INFORMATION_MESSAGE);
-        
+        Component currentPanel = getCurrentVisiblePanel();
+
+        if (currentPanel instanceof DashboardHomePanel) {
+            panelName = "Dashboard Home";
+        } else if (currentPanel instanceof SalesPanel) {
+            panelName = "Sales Panel";
+        } else if (currentPanel instanceof InventoryManagementPanel) {
+            panelName = "Inventory Management";
+        } else if (currentPanel instanceof ReportGeneratorPanel) {
+            panelName = "Reports";
+        } else if (currentPanel instanceof SettingsPanel) {
+            panelName = "Settings";
+        }
+
+        // Show print dialog instead of placeholder message
+        showPrintDialog(currentPanel, panelName);
+
         updateStatus("Print command issued for " + panelName);
     }
-    
+
+    private Component getCurrentVisiblePanel() {
+        for (Component comp : mainContentPanel.getComponents()) {
+            if (comp.isVisible()) {
+                return comp;
+            }
+        }
+        return null;
+    }
+
+    private void showPrintDialog(Component componentToPrint, String panelName) {
+        if (componentToPrint == null) {
+            JOptionPane.showMessageDialog(this,
+                    "No panel available to print.",
+                    "Print Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        PrintDialog printDialog = new PrintDialog(
+                (Frame) SwingUtilities.getWindowAncestor(this),
+                componentToPrint,
+                panelName
+        );
+        printDialog.setVisible(true);
+    }
+
+    /**
+     * Custom Printable for printing GUI components
+     */
+    private class ComponentPrintable implements Printable {
+        private Component component;
+        private String title;
+
+        public ComponentPrintable(Component component, String title) {
+            this.component = component;
+            this.title = title;
+        }
+
+        @Override
+        public int print(Graphics g, PageFormat pf, int pageIndex) {
+            if (pageIndex > 0) {
+                return NO_SUCH_PAGE;
+            }
+
+            Graphics2D g2d = (Graphics2D) g;
+            g2d.translate(pf.getImageableX(), pf.getImageableY());
+
+            // Print header
+            g2d.setFont(new Font("Arial", Font.BOLD, 12));
+            g2d.drawString("Nardo's Inventory System - " + title, 50, 20);
+            g2d.drawString("Printed: " +
+                            java.time.LocalDateTime.now().format(
+                                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                    50, 35);
+            g2d.drawString("Printed by: " + currentUser.getUsername(), 50, 50);
+
+            // Draw line separator
+            g2d.drawLine(50, 60, (int)pf.getImageableWidth() - 50, 60);
+
+            // Translate for component
+            g2d.translate(0, 80);
+
+            // Scale component to fit page width
+            double scaleX = (pf.getImageableWidth() - 100) / component.getWidth();
+            double scaleY = (pf.getImageableHeight() - 150) / component.getHeight();
+            double scale = Math.min(scaleX, scaleY);
+
+            if (scale < 1.0) {
+                g2d.scale(scale, scale);
+            }
+
+            // Print the component
+            component.printAll(g2d);
+
+            return PAGE_EXISTS;
+        }
+    }
+
     private void refreshDashboard() {
         loadDashboardData();
         updateStatus("Dashboard refreshed at " + 
@@ -908,73 +1002,136 @@ public class MainDashboard extends JFrame {
         setLocation((screenSize.width - frameSize.width) / 2,
                    (screenSize.height - frameSize.height) / 2);
     }
-    
+
     // Inner class for dashboard home panel
     private class DashboardHomePanel extends JPanel {
         public DashboardHomePanel() {
             setLayout(new BorderLayout());
             setBackground(new Color(245, 245, 245));
-            
+
             // Create welcome content
             JPanel welcomePanel = new JPanel(new BorderLayout());
             welcomePanel.setBackground(new Color(33, 150, 243));
-            welcomePanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
-            
+            welcomePanel.setBorder(BorderFactory.createEmptyBorder(40, 30, 40, 30));
+
             JLabel titleLabel = new JLabel("<html><center>" +
-                "<h1 style='color:white;'>Nardo's Inventory System</h1>" +
-                "<p style='color:white; font-size:16px;'>Complete Inventory Management Solution</p>" +
-                "</center></html>", SwingConstants.CENTER);
-            
+                    "<h1 style='color:white; font-size:32px;'>Nardo's Inventory System</h1>" +
+                    "<p style='color:white; font-size:18px; margin-top:10px;'>Complete Inventory Management Solution</p>" +
+                    "</center></html>", SwingConstants.CENTER);
+
             welcomePanel.add(titleLabel, BorderLayout.CENTER);
-            
-            // Create features panel
-            JPanel featuresPanel = new JPanel(new GridLayout(2, 3, 20, 20));
-            featuresPanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
+
+            // Create features panel with centered layout
+            JPanel featuresPanel = new JPanel(new GridBagLayout());
             featuresPanel.setBackground(Color.WHITE);
-            
-            featuresPanel.add(createFeatureCard("💰", "Sales Processing", 
-                "Process sales with automatic inventory deduction"));
-            featuresPanel.add(createFeatureCard("📊", "Report Generation", 
-                "Generate comprehensive inventory and sales reports"));
-            featuresPanel.add(createFeatureCard("📈", "Daily Summary", 
-                "View daily activity summary"));
-            featuresPanel.add(createFeatureCard("⚡", "Quick Sales", 
-                "3-click sales processing for fast transactions"));
-            featuresPanel.add(createFeatureCard("🔔", "Low Stock Alerts", 
-                "Automatic stock level notifications"));
-            featuresPanel.add(createFeatureCard("📋", "Sales History", 
-                "View and analyze past sales transactions"));
-            
+
+            // Create a grid panel for the feature cards
+            JPanel cardsGrid = new JPanel(new GridLayout(2, 3, 30, 30));
+            cardsGrid.setBackground(Color.WHITE);
+            cardsGrid.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
+
+            cardsGrid.add(createFeatureCard("💰", "Sales Processing",
+                    "Process sales with automatic inventory deduction"));
+            cardsGrid.add(createFeatureCard("📊", "Report Generation",
+                    "Generate comprehensive inventory and sales reports"));
+            cardsGrid.add(createFeatureCard("📈", "Daily Summary",
+                    "View daily activity summary"));
+            cardsGrid.add(createFeatureCard("⚡", "Quick Sales",
+                    "3-click sales processing for fast transactions"));
+            cardsGrid.add(createFeatureCard("🔔", "Low Stock Alerts",
+                    "Automatic stock level notifications"));
+            cardsGrid.add(createFeatureCard("📋", "Sales History",
+                    "View and analyze past sales transactions"));
+
+            // Center the cards grid within the features panel
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = 0;
+            gbc.gridy = 0;
+            gbc.weightx = 1.0;
+            gbc.weighty = 1.0;
+            gbc.fill = GridBagConstraints.NONE;
+            gbc.anchor = GridBagConstraints.CENTER;
+            featuresPanel.add(cardsGrid, gbc);
+
             add(welcomePanel, BorderLayout.NORTH);
             add(featuresPanel, BorderLayout.CENTER);
         }
-        
+
         private JPanel createFeatureCard(String icon, String title, String description) {
-            JPanel card = new JPanel(new BorderLayout(10, 10));
+            JPanel card = new JPanel();
+            card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
             card.setBackground(Color.WHITE);
             card.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-                BorderFactory.createEmptyBorder(20, 20, 20, 20)
+                    BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
+                    BorderFactory.createEmptyBorder(25, 20, 25, 20)
             ));
-            
-            JLabel iconLabel = new JLabel(icon, SwingConstants.CENTER);
-            iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 36));
-            
+            card.setMinimumSize(new Dimension(220, 250));
+            card.setPreferredSize(new Dimension(240, 280));
+            card.setMaximumSize(new Dimension(260, 300));
+
+            // Icon panel with proper sizing
+            JPanel iconPanel = new JPanel(new BorderLayout());
+            iconPanel.setBackground(Color.WHITE);
+            iconPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
+            iconPanel.setPreferredSize(new Dimension(100, 100));
+
+            JLabel iconLabel = new JLabel(icon);
+            // Use a font that supports emojis and set reasonable size
+            try {
+                iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 56)); // Reduced from 64/72
+            } catch (Exception e) {
+                // Fallback if Segoe UI Emoji is not available
+                iconLabel.setFont(new Font("Arial Unicode MS", Font.PLAIN, 56));
+            }
+            iconLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            iconLabel.setVerticalAlignment(SwingConstants.CENTER);
+
+            // Add some padding around the emoji
+            iconLabel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+            // Ensure icon label has enough space
+            iconLabel.setMinimumSize(new Dimension(80, 80));
+            iconLabel.setPreferredSize(new Dimension(90, 90));
+
+            // Add icon label to center of icon panel
+            iconPanel.add(iconLabel, BorderLayout.CENTER);
+
+            // Title label
             JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
-            titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
-            
+            titleLabel.setFont(new Font("Arial", Font.BOLD, 16)); // Slightly smaller title
+            titleLabel.setForeground(new Color(33, 150, 243));
+            titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            titleLabel.setBorder(BorderFactory.createEmptyBorder(15, 0, 10, 0));
+
+            // Description panel
+            JPanel descPanel = new JPanel(new BorderLayout());
+            descPanel.setBackground(Color.WHITE);
+            descPanel.setMaximumSize(new Dimension(220, 80));
+
             JTextArea descArea = new JTextArea(description);
             descArea.setFont(new Font("Arial", Font.PLAIN, 12));
             descArea.setLineWrap(true);
             descArea.setWrapStyleWord(true);
             descArea.setEditable(false);
             descArea.setBackground(Color.WHITE);
-            descArea.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
-            
-            card.add(iconLabel, BorderLayout.NORTH);
-            card.add(titleLabel, BorderLayout.CENTER);
-            card.add(descArea, BorderLayout.SOUTH);
-            
+            descArea.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+
+            // Center the text
+            descArea.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+            JScrollPane descScroll = new JScrollPane(descArea);
+            descScroll.setBorder(null);
+            descScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+            descScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+            descPanel.add(descScroll, BorderLayout.CENTER);
+
+            // Add components with proper spacing
+            card.add(iconPanel);
+            card.add(Box.createRigidArea(new Dimension(0, 5)));
+            card.add(titleLabel);
+            card.add(Box.createRigidArea(new Dimension(0, 10)));
+            card.add(descPanel);
+
             return card;
         }
     }
@@ -1147,6 +1304,225 @@ public class MainDashboard extends JFrame {
                     "Daily Summary - Database Error", JOptionPane.ERROR_MESSAGE);
 
             updateStatus("Failed to generate daily summary - Database error");
+        }
+    }
+
+    /**
+     * Print Dialog with print options
+     */
+    private class PrintDialog extends JDialog {
+        private Component component;
+        private String panelName;
+        private JCheckBox printHeaderCheck;
+        private JRadioButton portraitRadio;
+        private JRadioButton landscapeRadio;
+        private JButton printButton;
+        private JButton previewButton;
+        private JButton cancelButton;
+
+        public PrintDialog(Frame parent, Component component, String panelName) {
+            super(parent, "Print Options - " + panelName, true);
+            this.component = component;
+            this.panelName = panelName;
+
+            initializeComponents();
+            layoutComponents();
+            setupListeners();
+
+            setSize(400, 300);
+            setLocationRelativeTo(parent);
+        }
+
+        private void initializeComponents() {
+            printHeaderCheck = new JCheckBox("Include header with timestamp", true);
+
+            portraitRadio = new JRadioButton("Portrait", true);
+            landscapeRadio = new JRadioButton("Landscape");
+            ButtonGroup orientationGroup = new ButtonGroup();
+            orientationGroup.add(portraitRadio);
+            orientationGroup.add(landscapeRadio);
+
+            printButton = new JButton("Print");
+            previewButton = new JButton("Print Preview");
+            cancelButton = new JButton("Cancel");
+        }
+
+        private void layoutComponents() {
+            setLayout(new BorderLayout(10, 10));
+
+            // Options panel
+            JPanel optionsPanel = new JPanel(new GridBagLayout());
+            optionsPanel.setBorder(BorderFactory.createTitledBorder("Print Options"));
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.insets = new Insets(5, 5, 5, 5);
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.anchor = GridBagConstraints.WEST;
+
+            gbc.gridx = 0; gbc.gridy = 0;
+            optionsPanel.add(printHeaderCheck, gbc);
+
+            gbc.gridy = 1;
+            optionsPanel.add(new JLabel("Orientation:"), gbc);
+
+            gbc.gridy = 2;
+            JPanel orientationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            orientationPanel.add(portraitRadio);
+            orientationPanel.add(landscapeRadio);
+            optionsPanel.add(orientationPanel, gbc);
+
+            // Button panel
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
+            buttonPanel.add(previewButton);
+            buttonPanel.add(printButton);
+            buttonPanel.add(cancelButton);
+
+            add(optionsPanel, BorderLayout.CENTER);
+            add(buttonPanel, BorderLayout.SOUTH);
+        }
+
+        private void setupListeners() {
+            printButton.addActionListener(e -> performPrint());
+            previewButton.addActionListener(e -> showPrintPreview());
+            cancelButton.addActionListener(e -> dispose());
+        }
+
+        private void performPrint() {
+            try {
+                PrinterJob job = PrinterJob.getPrinterJob();
+
+                // Set job name
+                job.setJobName("Nardo's Inventory - " + panelName);
+
+                // Create printable
+                Printable printable = new ComponentPrintable(component, panelName);
+
+                // Get page format
+                PageFormat pageFormat = job.defaultPage();
+
+                // Set orientation
+                if (landscapeRadio.isSelected()) {
+                    pageFormat.setOrientation(PageFormat.LANDSCAPE);
+                } else {
+                    pageFormat.setOrientation(PageFormat.PORTRAIT);
+                }
+
+                job.setPrintable(printable, pageFormat);
+
+                // Show print dialog
+                if (job.printDialog()) {
+                    job.print();
+                    JOptionPane.showMessageDialog(PrintDialog.this,
+                            "Print job sent to printer successfully.",
+                            "Print Complete", JOptionPane.INFORMATION_MESSAGE);
+                    dispose();
+                }
+            } catch (PrinterException e) {
+                JOptionPane.showMessageDialog(PrintDialog.this,
+                        "Print error: " + e.getMessage(),
+                        "Print Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        private void showPrintPreview() {
+            PrintPreviewDialog preview = new PrintPreviewDialog(
+                    (Frame) SwingUtilities.getWindowAncestor(this),
+                    component,
+                    panelName
+            );
+            preview.setVisible(true);
+        }
+    }
+
+    /**
+     * Print Preview Dialog
+     */
+    private class PrintPreviewDialog extends JDialog {
+        private Component component;
+        private String panelName;
+
+        public PrintPreviewDialog(Frame parent, Component component, String panelName) {
+            super(parent, "Print Preview - " + panelName, true);
+            this.component = component;
+            this.panelName = panelName;
+
+            initComponents();
+            setSize(800, 600);
+            setLocationRelativeTo(parent);
+        }
+
+        private void initComponents() {
+            JPanel mainPanel = new JPanel(new BorderLayout());
+
+            // Preview panel
+            JPanel previewPanel = new PreviewPanel();
+            JScrollPane scrollPane = new JScrollPane(previewPanel);
+            scrollPane.setBorder(BorderFactory.createTitledBorder("Preview"));
+
+            // Buttons
+            JButton printButton = new JButton("Print");
+            JButton closeButton = new JButton("Close");
+
+            printButton.addActionListener(e -> {
+                // Reuse print functionality
+                PrintDialog printDialog = new PrintDialog(
+                        (Frame) SwingUtilities.getWindowAncestor(this),
+                        component,
+                        panelName
+                );
+                printDialog.setVisible(true);
+            });
+
+            closeButton.addActionListener(e -> dispose());
+
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            buttonPanel.add(printButton);
+            buttonPanel.add(closeButton);
+
+            mainPanel.add(scrollPane, BorderLayout.CENTER);
+            mainPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+            add(mainPanel);
+        }
+
+        private class PreviewPanel extends JPanel {
+            private static final double SCALE = 0.5;
+
+            public PreviewPanel() {
+                setPreferredSize(new Dimension(
+                        (int)(component.getWidth() * SCALE) + 100,
+                        (int)(component.getHeight() * SCALE) + 150
+                ));
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g;
+
+                // Draw paper background
+                g2d.setColor(Color.WHITE);
+                g2d.fillRect(50, 50, getWidth() - 100, getHeight() - 100);
+                g2d.setColor(Color.BLACK);
+                g2d.drawRect(50, 50, getWidth() - 100, getHeight() - 100);
+
+                // Draw header
+                g2d.setFont(new Font("Arial", Font.BOLD, 14));
+                g2d.drawString("Nardo's Inventory System - " + panelName, 60, 70);
+                g2d.setFont(new Font("Arial", Font.PLAIN, 12));
+                g2d.drawString("Printed: " +
+                                java.time.LocalDateTime.now().format(
+                                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
+                        60, 85);
+                g2d.drawString("Printed by: " + currentUser.getUsername(), 60, 100);
+
+                // Draw line separator
+                g2d.drawLine(60, 110, getWidth() - 60, 110);
+
+                // Draw component preview
+                g2d.translate(60, 130);
+                g2d.scale(SCALE, SCALE);
+                component.printAll(g2d);
+            }
         }
     }
 

@@ -116,10 +116,14 @@ public class ProductManagementForm extends JFrame {
     }
     
     private void layoutComponents() {
-        setLayout(new BorderLayout());
-        
+        setLayout(new BorderLayout(10, 10));
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 10));
+        searchPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder("Search & Filter"),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)
+        ));
+
         // Top search panel
-        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         searchPanel.add(new JLabel("Search:"));
         searchPanel.add(searchField);
         searchPanel.add(searchButton);
@@ -141,15 +145,20 @@ public class ProductManagementForm extends JFrame {
         
         topPanel.add(buttonPanel, BorderLayout.SOUTH);
         add(topPanel, BorderLayout.NORTH);
-        
-        // Center with table
+
+        // Center table with proper sizing
         JScrollPane scrollPane = new JScrollPane(productTable);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         add(scrollPane, BorderLayout.CENTER);
-        
-        // Status bar
+
+        // Status panel with padding
         JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        statusPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
         statusPanel.add(statusLabel);
         add(statusPanel, BorderLayout.SOUTH);
+
+        revalidate();
+        repaint();
     }
     
     /**

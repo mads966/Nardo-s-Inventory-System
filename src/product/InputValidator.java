@@ -5,11 +5,33 @@ import enums.Category;
 import java.util.regex.Pattern;
 
 /**
- * Input validation utility for product data and general user inputs.
- * Ensures data integrity and prevents SQL injection and XSS attacks.
+ * Input Validation Utility - SRS Requirement: Data Integrity and Security
+ * 
+ * Validates all user inputs for the product management system according to
+ * SRS business rules and security requirements. Prevents SQL injection,
+ * XSS attacks, and enforces business rule constraints.
+ * 
+ * Security Features:
+ * - SQL keyword detection and blocking
+ * - Special character filtering
+ * - Range validation for numeric inputs
+ * - Length constraints for string inputs
+ * - Pattern matching for structured data (email, phone)
+ * 
+ * Business Rule Enforcement (SRS 1.2 - Product Management):
+ * - Product names: 1-100 characters, alphanumeric with basic punctuation
+ * - Prices: Decimal format, positive, up to 999999.99
+ * - Quantities: Non-negative integers, up to 999999
+ * - Minimum stock: 0-10000 units (logical threshold)
+ * - Categories: Enumerated list (FOOD, BEVERAGES, SNACKS, ESSENTIALS, COMBO_MEALS)
+ * 
+ * Usage Pattern:
+ * 1. Collect user input from GUI fields
+ * 2. Call appropriate validation method
+ * 3. If validation fails, show error message to user
+ * 4. If validation passes, proceed with database operation
  */
 public class InputValidator {
-    // Patterns for validation
     private static final Pattern ALPHANUMERIC_PATTERN = Pattern.compile("^[a-zA-Z0-9\\s.,()-]*$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@(.+)$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^[0-9\\-+\\s()]*$");
@@ -152,18 +174,23 @@ public class InputValidator {
     }
     
     /**
-     * Sanitize input by removing potential SQL injection patterns
+     * Removes potentially dangerous characters from user input.
+     * Called before any database operations to prevent injection.
+     * 
+     * Removes: single quotes, double quotes, semicolons, SQL comment markers
      */
     public static String sanitizeInput(String input) {
         if (input == null) {
             return "";
         }
-        // Remove single quotes, double quotes, semicolons, and dashes at the beginning
-        return input.replaceAll("['\";--]", "").trim();
+        return input.replaceAll("['\";\\-\\-]", "").trim();
     }
     
     /**
-     * Check for common SQL keywords that might indicate injection attempt
+     * Detects SQL injection attempts by checking for common SQL keywords.
+     * Used in all user input validation.
+     * 
+     * Dangerous keywords: DROP, DELETE, INSERT, UPDATE, SELECT, EXEC, UNION, etc.
      */
     private static boolean containsSQLKeywords(String input) {
         String[] sqlKeywords = {

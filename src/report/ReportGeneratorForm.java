@@ -121,8 +121,8 @@ public class ReportGeneratorForm extends JPanel {
     }
 
     private void layoutComponents() {
-        setLayout(new BorderLayout(10, 10));
-        setBorder(new EmptyBorder(10, 10, 10, 10));
+        setLayout(new BorderLayout(15, 15));
+        setBorder(new EmptyBorder(15, 15, 15, 15));
 
         // Top panel: Controls
         JPanel controlPanel = new JPanel(new GridBagLayout());
@@ -204,6 +204,8 @@ public class ReportGeneratorForm extends JPanel {
 
         // Bottom: Status bar
         add(statusLabel, BorderLayout.SOUTH);
+        revalidate();
+        repaint();
     }
 
     private void setupListeners() {

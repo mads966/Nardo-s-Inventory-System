@@ -290,7 +290,9 @@ public class SalesPanel extends JPanel {
         
         worker.execute();
     }
-    
+
+
+
     public void processQuickSale() {
         String selected = (String) productCombo.getSelectedItem();
         if (selected == null || selected.isEmpty()) {
@@ -370,17 +372,60 @@ public class SalesPanel extends JPanel {
             "Sales history would open in a new window",
             "Sales History", JOptionPane.INFORMATION_MESSAGE);
     }
-    
+
     private void openNewSaleWindow() {
         // Create and show sales processing form
         JFrame frame = new JFrame("Sales Processing");
-        SalesProcessingForm salesForm = new SalesProcessingForm(
-            connection, currentUserId, currentUserName);
-        frame.setContentPane(salesForm);
+
+        // Set frame properties first
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+        // Create a main panel with proper layout
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setOpaque(true);
+        mainPanel.setBackground(Color.WHITE);
+
+        // Create the sales form
+        SalesProcessingForm salesForm = new SalesProcessingForm(
+                connection, currentUserId, currentUserName);
+
+        // Set preferred size for the form
+        salesForm.setPreferredSize(new Dimension(1200, 750));
+
+        // Add to main panel
+        mainPanel.add(salesForm, BorderLayout.CENTER);
+
+        // Set the frame's content pane
+        frame.setContentPane(mainPanel);
+
+        // Pack the frame (calculates size based on components)
         frame.pack();
+
+        // Ensure minimum size
+        frame.setMinimumSize(new Dimension(1000, 650));
+
+        // Center the frame
         frame.setLocationRelativeTo(this);
+
+        // Make the frame resizable
+        frame.setResizable(true);
+
+        // Set visible AFTER all components are added
         frame.setVisible(true);
+
+        // Force immediate painting
+        frame.repaint();
+
+        // For JDK-specific issues, try this workaround
+        if (System.getProperty("java.version").startsWith("1.8")) {
+            // Java 8 specific workaround
+            SwingUtilities.invokeLater(() -> {
+                frame.toFront();
+                frame.repaint();
+                salesForm.revalidate();
+                salesForm.repaint();
+            });
+        }
     }
     
     private void viewSelectedSale() {

@@ -11,10 +11,14 @@ import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 import database.*;
+import supplies.SupplierDAO;
 
 public class InventoryManagementPanel extends JPanel {
     private User currentUser;
@@ -34,10 +38,15 @@ public class InventoryManagementPanel extends JPanel {
         this.productService = new ProductService(null); // Connection handled by DAO
         this.stockMovementService = new StockMovementService(conn);
         this.alertManager = new AlertManager();
-        
+
+        setPreferredSize(new Dimension(1000, 600));
+
         initComponents();
         layoutComponents();
         loadProducts();
+
+        revalidate();
+        repaint();
     }
     
     private void initComponents() {
@@ -392,13 +401,14 @@ public class InventoryManagementPanel extends JPanel {
     public void addNewStock() {
         addNewProduct();
     }
-    
-    public void manageSuppliers() {
-        // Supplier management implementation would go here
-        JOptionPane.showMessageDialog(this,
-            "Supplier management functionality\n" +
-            "This feature would allow adding/editing suppliers.",
-            "Manage Suppliers", JOptionPane.INFORMATION_MESSAGE);
+
+    public void manageSuppliers(Connection connection) {
+        SupplierManagementDialog dialog = new SupplierManagementDialog(
+                (Frame) SwingUtilities.getWindowAncestor(this),
+                connection,
+                currentUser
+        );
+        dialog.setVisible(true);
     }
     
     // Inner class for product dialog
@@ -713,6 +723,525 @@ public class InventoryManagementPanel extends JPanel {
             };
             
             worker.execute();
+        }
+    }
+
+    // Inner class for supplier management dialog
+    private class SupplierManagementDialog extends JDialog {
+        private Connection connection;
+        private User currentUser;
+        private SupplierDAO supplierDAO;
+
+        private JTable suppliersTable;
+        private DefaultTableModel tableModel;
+        private JButton addButton, editButton, deleteButton, refreshButton;
+        private JTextField searchField;
+
+        public SupplierManagementDialog(Frame parent, Connection connection, User user) {
+            super(parent, "Manage Suppliers", true);
+            this.connection = connection;
+            this.currentUser = user;
+            this.supplierDAO = new SupplierDAO(connection);
+
+            initComponents();
+            layoutComponents();
+            loadSuppliers();
+
+            setSize(900, 500);
+            setLocationRelativeTo(parent);
+        }
+
+        private void initComponents() {
+            // Table setup
+            String[] columns = {"ID", "Name", "Contact Person", "Phone", "Email", "Address"};
+            tableModel = new DefaultTableModel(columns, 0) {
+                @Override
+                public boolean isCellEditable(int row, int column) {
+                    return false;
+                }
+            };
+            suppliersTable = new JTable(tableModel);
+            suppliersTable.setRowHeight(25);
+            suppliersTable.getSelectionModel().addListSelectionListener(e -> updateButtonStates());
+
+            // Search field
+            searchField = new JTextField(20);
+            searchField.addActionListener(e -> searchSuppliers());
+
+            // Buttons
+            addButton = new JButton("Add Supplier");
+            editButton = new JButton("Edit Supplier");
+            deleteButton = new JButton("Delete Supplier");
+            refreshButton = new JButton("Refresh");
+
+            JButton searchButton = new JButton("Search");
+            JButton clearSearchButton = new JButton("Clear");
+
+            // Add action listeners
+            addButton.addActionListener(e -> addNewSupplier());
+            editButton.addActionListener(e -> editSelectedSupplier());
+            deleteButton.addActionListener(e -> deleteSelectedSupplier());
+            refreshButton.addActionListener(e -> loadSuppliers());
+            searchButton.addActionListener(e -> searchSuppliers());
+            clearSearchButton.addActionListener(e -> {
+                searchField.setText("");
+                loadSuppliers();
+            });
+
+            // Initially disable edit/delete buttons
+            updateButtonStates();
+        }
+
+        private void layoutComponents() {
+            setLayout(new BorderLayout(10, 10));
+
+            // Top panel: Search
+            JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+            searchPanel.setBorder(new TitledBorder("Search Suppliers"));
+            searchPanel.add(new JLabel("Search by name:"));
+            searchPanel.add(searchField);
+            searchPanel.add(new JButton("Search") {{
+                addActionListener(e -> searchSuppliers());
+            }});
+            searchPanel.add(new JButton("Clear") {{
+                addActionListener(e -> {
+                    searchField.setText("");
+                    loadSuppliers();
+                });
+            }});
+
+            add(searchPanel, BorderLayout.NORTH);
+
+            // Center: Suppliers table
+            JScrollPane tableScroll = new JScrollPane(suppliersTable);
+            tableScroll.setBorder(new TitledBorder("Suppliers List"));
+            add(tableScroll, BorderLayout.CENTER);
+
+            // Bottom: Action buttons
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+            buttonPanel.add(addButton);
+            buttonPanel.add(editButton);
+            buttonPanel.add(deleteButton);
+            buttonPanel.add(refreshButton);
+
+            add(buttonPanel, BorderLayout.SOUTH);
+        }
+
+        private void loadSuppliers() {
+            SwingWorker<List<supplies.Supplier>, Void> worker = new SwingWorker<List<supplies.Supplier>, Void>() {
+                @Override
+                protected List<supplies.Supplier> doInBackground() throws Exception {
+                    return supplierDAO.getAllSuppliers();
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        List<supplies.Supplier> suppliers = get();
+                        tableModel.setRowCount(0);
+
+                        for (supplies.Supplier supplier : suppliers) {
+                            tableModel.addRow(new Object[]{
+                                    supplier.getSupplierId(),
+                                    supplier.getName(),
+                                    supplier.getContactPerson(),
+                                    supplier.getPhone(),
+                                    supplier.getEmail(),
+                                    supplier.getAddress()
+                            });
+                        }
+
+                        // Update status
+                        JOptionPane.showMessageDialog(SupplierManagementDialog.this,
+                                "Loaded " + suppliers.size() + " supplier(s)",
+                                "Information", JOptionPane.INFORMATION_MESSAGE);
+
+                    } catch (Exception e) {
+                        JOptionPane.showMessageDialog(SupplierManagementDialog.this,
+                                "Error loading suppliers: " + e.getMessage(),
+                                "Database Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            };
+
+            worker.execute();
+        }
+
+        private void searchSuppliers() {
+            String query = searchField.getText().trim();
+            if (query.isEmpty()) {
+                loadSuppliers();
+                return;
+            }
+
+            // Filter existing rows in the table for quick search
+            DefaultTableModel currentModel = (DefaultTableModel) suppliersTable.getModel();
+            int rowCount = currentModel.getRowCount();
+
+            if (rowCount == 0) return;
+
+            List<Object[]> filteredRows = new ArrayList<>();
+
+            for (int i = 0; i < rowCount; i++) {
+                String name = currentModel.getValueAt(i, 1).toString().toLowerCase();
+                if (name.contains(query.toLowerCase())) {
+                    Object[] row = new Object[6];
+                    for (int j = 0; j < 6; j++) {
+                        row[j] = currentModel.getValueAt(i, j);
+                    }
+                    filteredRows.add(row);
+                }
+            }
+
+            // Update table with filtered results
+            tableModel.setRowCount(0);
+            for (Object[] row : filteredRows) {
+                tableModel.addRow(row);
+            }
+
+            if (filteredRows.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "No suppliers found matching: " + query,
+                        "Search Results", JOptionPane.INFORMATION_MESSAGE);
+            }
+        }
+
+        private void addNewSupplier() {
+            SupplierFormDialog dialog = new SupplierFormDialog(
+                    (Frame) SwingUtilities.getWindowAncestor(this),
+                    null,
+                    supplierDAO
+            );
+            dialog.setVisible(true);
+
+            if (dialog.isSaved()) {
+                loadSuppliers();
+            }
+        }
+
+        private void editSelectedSupplier() {
+            int selectedRow = suppliersTable.getSelectedRow();
+            if (selectedRow < 0) {
+                JOptionPane.showMessageDialog(this,
+                        "Please select a supplier to edit",
+                        "No Selection", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            int supplierId = (int) tableModel.getValueAt(selectedRow, 0);
+
+            try {
+                supplies.Supplier supplier = supplierDAO.getSupplierById(supplierId);
+                if (supplier != null) {
+                    SupplierFormDialog dialog = new SupplierFormDialog(
+                            (Frame) SwingUtilities.getWindowAncestor(this),
+                            supplier,
+                            supplierDAO
+                    );
+                    dialog.setVisible(true);
+
+                    if (dialog.isSaved()) {
+                        loadSuppliers();
+                    }
+                }
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this,
+                        "Error loading supplier: " + e.getMessage(),
+                        "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+
+        private void deleteSelectedSupplier() {
+            int selectedRow = suppliersTable.getSelectedRow();
+            if (selectedRow < 0) {
+                JOptionPane.showMessageDialog(this,
+                        "Please select a supplier to delete",
+                        "No Selection", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            int supplierId = (int) tableModel.getValueAt(selectedRow, 0);
+            String supplierName = (String) tableModel.getValueAt(selectedRow, 1);
+
+            int confirm = JOptionPane.showConfirmDialog(this,
+                    "Are you sure you want to delete supplier:\n" +
+                            supplierName + " (ID: " + supplierId + ")?\n\n" +
+                            "Note: This action cannot be undone.",
+                    "Confirm Deletion", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+
+            if (confirm == JOptionPane.YES_OPTION) {
+                // Check if supplier is being used by any products before deleting
+                if (isSupplierUsed(supplierId)) {
+                    JOptionPane.showMessageDialog(this,
+                            "Cannot delete supplier " + supplierName +
+                                    " because it is associated with existing products.\n" +
+                                    "Please reassign products to another supplier first.",
+                            "Supplier in Use", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+
+                SwingWorker<Boolean, Void> worker = new SwingWorker<Boolean, Void>() {
+                    @Override
+                    protected Boolean doInBackground() throws Exception {
+                        // In real implementation, you would have a delete method in SupplierDAO
+                        // For now, we'll simulate it by preparing the query
+                        String query = "DELETE FROM suppliers WHERE supplier_id = ?";
+                        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                            stmt.setInt(1, supplierId);
+                            return stmt.executeUpdate() > 0;
+                        }
+                    }
+
+                    @Override
+                    protected void done() {
+                        try {
+                            if (get()) {
+                                JOptionPane.showMessageDialog(SupplierManagementDialog.this,
+                                        "Supplier deleted successfully",
+                                        "Success", JOptionPane.INFORMATION_MESSAGE);
+                                loadSuppliers();
+                            } else {
+                                JOptionPane.showMessageDialog(SupplierManagementDialog.this,
+                                        "Failed to delete supplier",
+                                        "Error", JOptionPane.ERROR_MESSAGE);
+                            }
+                        } catch (Exception e) {
+                            JOptionPane.showMessageDialog(SupplierManagementDialog.this,
+                                    "Error deleting supplier: " + e.getMessage(),
+                                    "Database Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                };
+
+                worker.execute();
+            }
+        }
+
+        private boolean isSupplierUsed(int supplierId) {
+            // Check if any products reference this supplier
+            try {
+                String query = "SELECT COUNT(*) FROM products WHERE supplier_id = ?";
+                try (PreparedStatement stmt = connection.prepareStatement(query)) {
+                    stmt.setInt(1, supplierId);
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        if (rs.next()) {
+                            return rs.getInt(1) > 0;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // If error, assume it might be used to prevent accidental deletion
+                return true;
+            }
+            return false;
+        }
+
+        private void updateButtonStates() {
+            int selectedRow = suppliersTable.getSelectedRow();
+            boolean hasSelection = selectedRow >= 0;
+
+            editButton.setEnabled(hasSelection);
+            deleteButton.setEnabled(hasSelection);
+
+            // Only owners can add/edit/delete suppliers
+            boolean isOwner = currentUser != null && "OWNER".equals(currentUser.getRole());
+            addButton.setEnabled(isOwner);
+            editButton.setEnabled(isOwner && hasSelection);
+            deleteButton.setEnabled(isOwner && hasSelection);
+        }
+
+        // Inner class for supplier form dialog
+        private class SupplierFormDialog extends JDialog {
+            private supplies.Supplier supplier;
+            private SupplierDAO supplierDAO;
+            private boolean saved = false;
+
+            private JTextField nameField, contactField, phoneField, emailField, addressField;
+            private JButton saveButton, cancelButton;
+
+            public SupplierFormDialog(Frame parent, supplies.Supplier existingSupplier, SupplierDAO supplierDAO) {
+                super(parent, existingSupplier == null ? "Add New Supplier" : "Edit Supplier", true);
+                this.supplier = existingSupplier;
+                this.supplierDAO = supplierDAO;
+
+                initComponents();
+                layoutComponents();
+
+                if (existingSupplier != null) {
+                    loadSupplierData();
+                }
+
+                setSize(500, 350);
+                setLocationRelativeTo(parent);
+            }
+
+            private void initComponents() {
+                nameField = new JTextField(30);
+                contactField = new JTextField(30);
+                phoneField = new JTextField(20);
+                emailField = new JTextField(30);
+                addressField = new JTextField(40);
+
+                saveButton = new JButton(supplier == null ? "Add Supplier" : "Update Supplier");
+                cancelButton = new JButton("Cancel");
+
+                saveButton.addActionListener(e -> saveSupplier());
+                cancelButton.addActionListener(e -> dispose());
+            }
+
+            private void layoutComponents() {
+                setLayout(new GridBagLayout());
+                GridBagConstraints gbc = new GridBagConstraints();
+                gbc.insets = new Insets(5, 5, 5, 5);
+                gbc.fill = GridBagConstraints.HORIZONTAL;
+
+                // Row 0: Name
+                gbc.gridx = 0; gbc.gridy = 0;
+                add(new JLabel("Supplier Name:*"), gbc);
+
+                gbc.gridx = 1; gbc.weightx = 1.0;
+                add(nameField, gbc);
+
+                // Row 1: Contact Person
+                gbc.gridx = 0; gbc.gridy = 1;
+                add(new JLabel("Contact Person:"), gbc);
+
+                gbc.gridx = 1;
+                add(contactField, gbc);
+
+                // Row 2: Phone
+                gbc.gridx = 0; gbc.gridy = 2;
+                add(new JLabel("Phone:"), gbc);
+
+                gbc.gridx = 1;
+                add(phoneField, gbc);
+
+                // Row 3: Email
+                gbc.gridx = 0; gbc.gridy = 3;
+                add(new JLabel("Email:"), gbc);
+
+                gbc.gridx = 1;
+                add(emailField, gbc);
+
+                // Row 4: Address
+                gbc.gridx = 0; gbc.gridy = 4;
+                add(new JLabel("Address:"), gbc);
+
+                gbc.gridx = 1;
+                add(addressField, gbc);
+
+                // Row 5: Buttons
+                gbc.gridx = 0; gbc.gridy = 5;
+                gbc.gridwidth = 2;
+                gbc.fill = GridBagConstraints.NONE;
+                gbc.anchor = GridBagConstraints.CENTER;
+
+                JPanel buttonPanel = new JPanel(new FlowLayout());
+                buttonPanel.add(saveButton);
+                buttonPanel.add(cancelButton);
+                add(buttonPanel, gbc);
+
+                // Add note about required field
+                gbc.gridy = 6;
+                JLabel noteLabel = new JLabel("* Required field");
+                noteLabel.setFont(new Font("Arial", Font.ITALIC, 10));
+                noteLabel.setForeground(Color.GRAY);
+                add(noteLabel, gbc);
+            }
+
+            private void loadSupplierData() {
+                if (supplier != null) {
+                    nameField.setText(supplier.getName());
+                    contactField.setText(supplier.getContactPerson());
+                    phoneField.setText(supplier.getPhone());
+                    emailField.setText(supplier.getEmail());
+                    addressField.setText(supplier.getAddress());
+                }
+            }
+
+            private void saveSupplier() {
+                try {
+                    // Validate inputs
+                    String name = nameField.getText().trim();
+                    if (name.isEmpty()) {
+                        throw new IllegalArgumentException("Supplier name is required");
+                    }
+
+                    String contactPerson = contactField.getText().trim();
+                    String phone = phoneField.getText().trim();
+                    String email = emailField.getText().trim();
+                    String address = addressField.getText().trim();
+
+                    // Validate email format if provided
+                    if (!email.isEmpty() && !email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                        throw new IllegalArgumentException("Invalid email format");
+                    }
+
+                    // Validate phone format if provided
+                    if (!phone.isEmpty() && !phone.matches("^[+]?[0-9\\s-]+$")) {
+                        throw new IllegalArgumentException("Invalid phone number format");
+                    }
+
+                    // Create or update supplier
+                    supplies.Supplier newSupplier;
+                    if (supplier == null) {
+                        // Check for duplicate supplier name
+                        if (supplierDAO.supplierNameExists(name)) {
+                            throw new IllegalArgumentException("A supplier with this name already exists");
+                        }
+
+                        newSupplier = new supplies.Supplier();
+                        newSupplier.setName(name);
+                        newSupplier.setContactPerson(contactPerson.isEmpty() ? null : contactPerson);
+                        newSupplier.setPhone(phone.isEmpty() ? null : phone);
+                        newSupplier.setEmail(email.isEmpty() ? null : email);
+                        newSupplier.setAddress(address.isEmpty() ? null : address);
+
+                        // Save new supplier
+                        boolean success = supplierDAO.createSupplier(newSupplier);
+                        if (!success) {
+                            throw new Exception("Failed to create supplier");
+                        }
+                    } else {
+                        // Update existing supplier
+                        newSupplier = supplier;
+                        newSupplier.setName(name);
+                        newSupplier.setContactPerson(contactPerson.isEmpty() ? null : contactPerson);
+                        newSupplier.setPhone(phone.isEmpty() ? null : phone);
+                        newSupplier.setEmail(email.isEmpty() ? null : email);
+                        newSupplier.setAddress(address.isEmpty() ? null : address);
+
+                        // Check for duplicate name (excluding current supplier)
+                        if (!name.equals(supplier.getName()) && supplierDAO.supplierNameExists(name)) {
+                            throw new IllegalArgumentException("A supplier with this name already exists");
+                        }
+
+                        boolean success = supplierDAO.updateSupplier(newSupplier);
+                        if (!success) {
+                            throw new Exception("Failed to update supplier");
+                        }
+                    }
+
+                    saved = true;
+                    JOptionPane.showMessageDialog(this,
+                            "Supplier " + (supplier == null ? "added" : "updated") + " successfully",
+                            "Success", JOptionPane.INFORMATION_MESSAGE);
+                    dispose();
+
+                } catch (IllegalArgumentException e) {
+                    JOptionPane.showMessageDialog(this,
+                            e.getMessage(),
+                            "Validation Error", JOptionPane.ERROR_MESSAGE);
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(this,
+                            "Error saving supplier: " + e.getMessage(),
+                            "Save Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+
+            public boolean isSaved() {
+                return saved;
+            }
         }
     }
 }
