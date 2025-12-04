@@ -1,0 +1,322 @@
+@startuml NardoInventorySystem
+
+' GUIS
+class GUI {
+  - currentUser: User
+  - mainWindow: main.MainDashboard
+  - loginScreen: LoginForm
+  + showLogin()
+  + showDashboard()
+  + showProductManagement()
+  + showSalesProcessing()
+  + showReports()
+  + showAlerts()
+}
+
+class LoginForm {
+  - usernameField: String
+  - passwordField: String
+  - loginButton: Button
+  + validateCredentials()
+  + authenticateUser()
+  + showError(message: String)
+}
+
+class main.MainDashboard {
+  - welcomeMessage: String
+  - quickActions: Button[]
+  - recentAlerts: List<LowStockAlert>
+  - salesPanel: SalesPanel
+  + displayQuickStats()
+  + navigateTo(section: String)
+  + processQuickSale()
+  + showAlertNotifications()
+}
+
+class ProductManagementForm {
+  - productTable: Table
+  - searchField: TextField
+  - filterOptions: CheckboxGroup
+  - addButton: Button
+  - editButton: Button
+  - deleteButton: Button
+  + searchProducts(criteria: String)
+  + filterProducts(filters: Map)
+  + addNewProduct()
+  + editProduct(productId: int)
+  + deactivateProduct(productId: int)
+  + validateProductData()
+}
+
+class SalesProcessingForm {
+  - productSearch: TextField
+  - quantityField: NumericField
+  - saleItems: Table
+  - totalAmount: Label
+  - processSaleButton: Button
+  + searchProductByName()
+  + addToSale()
+  + calculateTotal()
+  + processSale()
+  + printReceipt()
+}
+
+class ReportGeneratorForm {
+  - reportType: ComboBox<ReportType>
+  - dateRange: DatePicker
+  - generateButton: Button
+  - printButton: Button
+  - reportView: WebView
+  + generateReport()
+  + filterReport()
+  + printReport()
+  + exportReport()
+}
+
+class AlertNotificationPanel {
+  - alertList: List<LowStockAlert>
+  - refreshButton: Button
+  - resolveButton: Button
+  + displayAlerts()
+  + refreshAlerts()
+  + resolveAlert(alertId: int)
+  + notifyUser()
+}
+
+' MAIN CLASSES
+class User {
+  - userId: int
+  - username: String
+  - password: String (encrypted)
+  - role: UserRole
+  - email: String
+  - isActive: boolean
+  + login()
+  + logout()
+  + changePassword()
+}
+
+enum UserRole {
+  OWNER
+  STAFF
+}
+
+class Product {
+  - productId: int
+  - name: String
+  - description: String
+  - category: Category
+  - currentQuantity: int
+  - minStockLevel: int
+  - price: decimal
+  - costPrice: decimal
+  - supplierId: int
+  - isActive: boolean
+  + updateProduct()
+  + deactivateProduct()
+  + checkStockLevel()
+}
+
+enum Category {
+  FOOD
+  BEVERAGES
+  SNACKS
+  ESSENTIALS
+  COMBO_MEALS
+}
+
+class Supplier {
+  - supplierId: int
+  - name: String
+  - contactPerson: String
+  - phone: String
+  - email: String
+  - address: String
+  + addSupplier()
+  + updateSupplier()
+  + getSupplierProducts()
+}
+
+class StockMovement {
+  - movementId: int
+  - productId: int
+  - userId: int
+  - movementType: MovementType
+  - quantityChanged: int
+  - previousQuantity: int
+  - newQuantity: int
+  - reason: String
+  - timestamp: DateTime
+  + recordMovement()
+}
+
+enum MovementType {
+  SALE
+  RESTOCK
+  ADJUSTMENT
+  DAMAGE
+  RETURN
+}
+
+class Sale {
+  - saleId: int
+  - productId: int
+  - quantitySold: int
+  - salePrice: decimal
+  - totalAmount: decimal
+  - saleDate: DateTime
+  - userId: int
+  + processSale()
+  + calculateTotal()
+}
+
+class LowStockAlert {
+  - alertId: int
+  - productId: int
+  - currentQuantity: int
+  - minStockLevel: int
+  - alertDate: DateTime
+  - isResolved: boolean
+  + triggerAlert()
+  + resolveAlert()
+}
+
+class Report {
+  - reportId: int
+  - reportType: ReportType
+  - generatedDate: DateTime
+  - generatedBy: int
+  - data: String
+  + generateInventoryReport()
+  + generateTransactionReport()
+  + printReport()
+}
+
+enum ReportType {
+  INVENTORY_SUMMARY
+  TRANSACTION_HISTORY
+  LOW_STOCK
+  SALES_REPORT
+}
+
+' Controller Layer
+class SystemController {
+  - productManager: ProductManager
+  - salesProcessor: SalesProcessor
+  - alertManager: AlertManager
+  - reportGenerator: ReportGenerator
+  - userManager: UserManager
+  + authenticateUser(credentials)
+  + processSale(saleData)
+  + updateProduct(productData)
+  + generateReport(params)
+  + getLowStockAlerts()
+}
+
+class ProductManager {
+  + addProduct(productData)
+  + updateProduct(productId, updates)
+  + deactivateProduct(productId)
+  + searchProducts(criteria)
+  + filterProducts(filters)
+  + getProductStockLevel(productId)
+}
+
+class SalesProcessor {
+  + processSale(items)
+  + calculateTotal(items)
+  + updateInventory(productId, quantity)
+  + generateReceipt(saleId)
+}
+
+class AlertManager {
+  + checkStockLevels()
+  + triggerLowStockAlert(productId)
+  + resolveAlert(alertId)
+  + getActiveAlerts()
+}
+
+class ReportGenerator {
+  + generateInventoryReport()
+  + generateTransactionReport(dateRange)
+  + generateSalesReport()
+  + generateLowStockReport()
+}
+
+
+' GUI Relationships
+GUI "1" -- "1" SystemController : uses >
+GUI "1" -- "1" main.MainDashboard : contains >
+GUI "1" -- "1" LoginForm : contains >
+main.MainDashboard "1" -- "*" ProductManagementForm : navigates to >
+main.MainDashboard "1" -- "*" SalesProcessingForm : navigates to >
+main.MainDashboard "1" -- "*" ReportGeneratorForm : navigates to >
+main.MainDashboard "1" -- "1" AlertNotificationPanel : contains >
+
+' Controller to Entity Relationships
+SystemController "1" -- "1" ProductManager : manages >
+SystemController "1" -- "1" SalesProcessor : manages >
+SystemController "1" -- "1" AlertManager : manages >
+SystemController "1" -- "1" ReportGenerator : manages >
+
+ProductManager "1" -- "*" Product : manages >
+SalesProcessor "1" -- "*" Sale : processes >
+SalesProcessor "1" -- "*" Product : updates >
+AlertManager "1" -- "*" LowStockAlert : manages >
+ReportGenerator "1" -- "*" Report : generates >
+
+' Core Entity Relationships (unchanged)
+User "1" -- "*" StockMovement : records >
+User "1" -- "*" Sale : processes >
+User "1" -- "*" Report : generates >
+
+Product "1" -- "*" StockMovement : tracks >
+Product "1" -- "*" Sale : sold_in >
+Product "1" -- "*" LowStockAlert : triggers >
+Product "*" -- "1" Supplier : supplied_by >
+Product "1" -- "*" Report : included_in >
+
+Supplier "1" -- "*" Product : supplies >
+
+StockMovement "1" -- "1" Product : affects >
+StockMovement "1" -- "1" User : performed_by >
+
+Sale "1" -- "1" Product : contains >
+Sale "1" -- "1" User : processed_by >
+
+LowStockAlert "1" -- "1" Product : for_product >
+
+' notes
+note top of ProductManagementForm
+  • Search by name/category (SRS 1.4, 1.6)
+  • Filter by supplier/stock status
+  • Results in <10 seconds (Performance)
+  • 3-click sales from dashboard (Usability)
+end note
+
+note top of SalesProcessingForm
+  • Real-time inventory deduction (SRS 1.3)
+  • Auto low-stock triggering
+  • Quick product search
+end note
+
+note top of AlertNotificationPanel
+  • Automatic low-stock alerts (SRS 1.2)
+  • Within 10 minutes of threshold
+  • Visual and system notifications
+end note
+
+note top of LoginForm
+  • Role-based access (Security)
+  • Session timeout: 15 min
+  • Password encryption
+end note
+
+note top of SystemController
+  • Server-side validation
+  • Parameterized queries
+  • Transaction logging
+  • Data integrity enforcement
+end note
+
+@enduml

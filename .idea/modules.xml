@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/NardoIventorySystem.iml" filepath="$PROJECT_DIR$/NardoIventorySystem.iml" />
+      <module fileurl="file://$PROJECT_DIR$/NardoFinal.iml" filepath="$PROJECT_DIR$/NardoFinal.iml" />
     </modules>
   </component>
 </project>

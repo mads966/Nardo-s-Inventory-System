@@ -1,1 +1,0 @@
-# Nardo-s-Inventory-System
