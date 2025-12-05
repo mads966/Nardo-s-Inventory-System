@@ -1,5 +1,7 @@
 package sale;
 import product.*;
+import login.User;
+import login.UserRole;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
@@ -30,6 +32,7 @@ public class SalesPanel extends JPanel {
     
     private int currentUserId;
     private String currentUserName;
+    private User currentUser;
     
     public SalesPanel(Connection connection, int userId, String userName) {
         this.currentUserId = userId;

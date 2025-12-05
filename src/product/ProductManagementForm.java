@@ -408,13 +408,116 @@ public class ProductManagementForm extends JFrame {
                 return;
             }
             
-            // TODO: Implement edit dialog similar to add product
-            JOptionPane.showMessageDialog(this, "Edit functionality for Product ID: " + productId,
-                "Edit Product", JOptionPane.INFORMATION_MESSAGE);
+            // Show edit dialog
+            showEditProductDialog(product);
         } catch (SQLException e) {
             JOptionPane.showMessageDialog(this, "Error loading product: " + e.getMessage(),
                 "Database Error", JOptionPane.ERROR_MESSAGE);
         }
+    }
+    
+    /**
+     * Show edit product dialog - SRS 1.1
+     */
+    private void showEditProductDialog(Product product) {
+        JDialog dialog = new JDialog(this, "Edit Product", true);
+        dialog.setSize(400, 350);
+        dialog.setLocationRelativeTo(this);
+        
+        JPanel panel = new JPanel(new GridLayout(8, 2, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Input fields
+        JTextField nameField = new JTextField(product.getName());
+        JComboBox<String> categoryCombo = new JComboBox<>();
+        for (Category c : Category.values()) {
+            categoryCombo.addItem(c.toString());
+        }
+        categoryCombo.setSelectedItem(product.getCategory());
+        
+        JTextField priceField = new JTextField(String.valueOf(product.getPrice()));
+        JTextField quantityField = new JTextField(String.valueOf(product.getQuantity()));
+        JTextField minStockField = new JTextField(String.valueOf(product.getMinStock()));
+        JTextField supplierIdField = new JTextField(product.getSupplierId() != null ? 
+            String.valueOf(product.getSupplierId()) : "");
+        
+        panel.add(new JLabel("Product Name:"));
+        panel.add(nameField);
+        panel.add(new JLabel("Category:"));
+        panel.add(categoryCombo);
+        panel.add(new JLabel("Price:"));
+        panel.add(priceField);
+        panel.add(new JLabel("Quantity:"));
+        panel.add(quantityField);
+        panel.add(new JLabel("Min Stock:"));
+        panel.add(minStockField);
+        panel.add(new JLabel("Supplier ID:"));
+        panel.add(supplierIdField);
+        
+        JButton saveButton = new JButton("Save");
+        JButton cancelButton = new JButton("Cancel");
+        
+        saveButton.addActionListener(e -> {
+            String name = nameField.getText();
+            String category = (String) categoryCombo.getSelectedItem();
+            String priceStr = priceField.getText();
+            String quantityStr = quantityField.getText();
+            String minStockStr = minStockField.getText();
+            String supplierIdStr = supplierIdField.getText();
+            
+            // Validate all inputs
+            if (!InputValidator.validateProductName(name)) {
+                JOptionPane.showMessageDialog(dialog, "Invalid product name.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (!InputValidator.validateCategory(category)) {
+                JOptionPane.showMessageDialog(dialog, "Invalid category.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (!InputValidator.validatePrice(priceStr)) {
+                JOptionPane.showMessageDialog(dialog, "Invalid price (0 < price <= 999999.99).", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (!InputValidator.validateQuantity(quantityStr)) {
+                JOptionPane.showMessageDialog(dialog, "Invalid quantity (0-999999).", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (!InputValidator.validateMinStock(minStockStr)) {
+                JOptionPane.showMessageDialog(dialog, "Invalid minimum stock (0-10000).", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            if (!InputValidator.validateSupplierId(supplierIdStr)) {
+                JOptionPane.showMessageDialog(dialog, "Invalid supplier ID.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            // Update product
+            product.setName(name);
+            product.setCategory(category);
+            product.setPrice(Double.parseDouble(priceStr));
+            product.setQuantity(Integer.parseInt(quantityStr));
+            product.setMinStock(Integer.parseInt(minStockStr));
+            if (!supplierIdStr.isEmpty()) {
+                product.setSupplierId(Integer.parseInt(supplierIdStr));
+            }
+            
+            try {
+                productManager.updateProduct(product);
+                JOptionPane.showMessageDialog(dialog, "Product updated successfully.", "Success", JOptionPane.INFORMATION_MESSAGE);
+                dialog.dispose();
+                loadProducts();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog, "Error updating product: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        
+        cancelButton.addActionListener(e -> dialog.dispose());
+        
+        panel.add(saveButton);
+        panel.add(cancelButton);
+        
+        dialog.add(panel);
+        dialog.setVisible(true);
     }
     
     /**

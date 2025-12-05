@@ -6,10 +6,12 @@ import java.awt.*;
 public class ChangePasswordVerificationGUI extends JFrame {
     private User currentUser;
     private UserManager userManager;
+    private AuthenticationService authenticationService;
     
     public ChangePasswordVerificationGUI(User currentUser, UserManager userManager) {
         this.currentUser = currentUser;
         this.userManager = userManager;
+        this.authenticationService = new AuthenticationService(userManager);
         
         initComponents();
         setTitle("Change Password");

@@ -7,12 +7,15 @@ import java.time.LocalDateTime;
 
 import product.*;
 import stock.*;
+import login.User;
+import login.UserRole;
 
 public class SalesProcessor {
     private SaleDAO saleDAO;
     private ProductDAO productDAO;
     private StockMovementDAO stockMovementDAO;
     private Connection connection;
+    private User currentUser;
     
     public SalesProcessor(Connection connection) {
         this.connection = connection;

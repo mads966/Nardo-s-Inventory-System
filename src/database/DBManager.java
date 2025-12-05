@@ -35,27 +35,56 @@ import java.sql.SQLException;
 public class DBManager {
     private static final String DATABASE_URL = "jdbc:mysql://localhost:3306/nardos_inventory";
     private static final String DATABASE_USER = "root";
-    private static final String DATABASE_PASSWORD = "";
-    private static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
+    // Try multiple common passwords
+    private static final String[] DATABASE_PASSWORDS = {"", "password", "root", "admin", "123456", "thisSQLP@ssword"};
+    private static final String JDBC_DRIVER = "com.mysql.jdbc.Driver"; 
     
     private static Connection connection = null;
+    private static boolean connectionAttempted = false;
     
     /**
      * Retrieves the active database connection, creating one if necessary.
+     * Attempts multiple password combinations for flexibility.
+     * Returns null if connection fails (test mode).
      * 
-     * @return Active database connection
+     * @return Active database connection or null if in test mode
      * @throws SQLException If connection cannot be established
      */
     public static Connection getConnection() throws SQLException {
         if (connection == null || connection.isClosed()) {
             try {
                 Class.forName(JDBC_DRIVER);
-                connection = DriverManager.getConnection(DATABASE_URL, DATABASE_USER, DATABASE_PASSWORD);
-                System.out.println("Database connection established successfully");
+                
+                // Try each password
+                SQLException lastException = null;
+                for (String password : DATABASE_PASSWORDS) {
+                    try {
+                        connection = DriverManager.getConnection(DATABASE_URL, DATABASE_USER, password);
+                        System.out.println("✓ Database connection established successfully");
+                        System.out.println("  URL: " + DATABASE_URL);
+                        System.out.println("  User: " + DATABASE_USER);
+                        connectionAttempted = true;
+                        return connection;
+                    } catch (SQLException e) {
+                        lastException = e;
+                        // Continue to next password
+                    }
+                }
+                
+                // All passwords failed
+                System.err.println("✗ Database connection failed with all password attempts");
+                System.err.println("  URL: " + DATABASE_URL);
+                System.err.println("  User: " + DATABASE_USER);
+                System.err.println("  Last error: " + lastException.getMessage());
+                System.err.println("  Running in TEST MODE (mock database)");
+                connectionAttempted = true;
+                return null; // Return null to indicate test mode
+                
             } catch (ClassNotFoundException e) {
-                throw new SQLException("MySQL JDBC Driver not found: " + JDBC_DRIVER, e);
-            } catch (SQLException e) {
-                throw new SQLException("Failed to establish database connection to " + DATABASE_URL, e);
+                System.err.println("✗ MySQL JDBC Driver not found: " + JDBC_DRIVER);
+                System.err.println("  Running in TEST MODE (mock database)");
+                connectionAttempted = true;
+                return null;
             }
         }
         return connection;

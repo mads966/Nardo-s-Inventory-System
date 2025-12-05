@@ -93,11 +93,16 @@ public class MainDashboard extends JFrame {
     
     // Timer for auto-refresh
     private Timer dashboardTimer;
+    private Timer sessionTimer;
+    private String sessionId;
     
     public MainDashboard(Connection connection, User user, UserManager userManager) {
         this.connection = connection;
         this.currentUser = user;
         this.userManager = userManager;
+        
+        // Create session
+        this.sessionId = SessionManager.getInstance().createSession(user);
         
         // Initialize services
         initializeServices();
@@ -119,6 +124,9 @@ public class MainDashboard extends JFrame {
         
         // Start dashboard updates
         startDashboardUpdates();
+        
+        // Start session validation
+        startSessionValidation();
         
         // Load initial data
         loadDashboardData();
@@ -685,6 +693,41 @@ public class MainDashboard extends JFrame {
                 });
             }
         }, 30000, 30000);
+    }
+    
+    /**
+     * Start session validation timer
+     * SRS 1.1.4: Session Timeout After Inactivity
+     */
+    private void startSessionValidation() {
+        sessionTimer = new Timer(true);
+        sessionTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                SwingUtilities.invokeLater(() -> {
+                    SessionManager.UserSession session = 
+                        SessionManager.getInstance().getSession(sessionId);
+                    
+                    if (session == null || !session.isValid()) {
+                        // Session expired
+                        JOptionPane.showMessageDialog(MainDashboard.this,
+                            "Your session has expired due to inactivity.\n" +
+                            "Please login again.",
+                            "Session Expired", JOptionPane.WARNING_MESSAGE);
+                        logout();
+                    } else {
+                        long remainingTime = session.getRemainingTime();
+                        // Show warning when 5 minutes remaining
+                        if (remainingTime < 5 * 60 * 1000 && remainingTime > 4 * 60 * 1000) {
+                            JOptionPane.showMessageDialog(MainDashboard.this,
+                                "Your session will expire in 5 minutes due to inactivity.\n" +
+                                "Please save your work.",
+                                "Session Expiring Soon", JOptionPane.WARNING_MESSAGE);
+                        }
+                    }
+                });
+            }
+        }, 60000, 60000); // Check every minute
     }
     
     private void updateTimeLabel() {

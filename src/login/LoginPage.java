@@ -4,16 +4,21 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
 import main.MainDashboard;
 
 public class LoginPage extends JFrame {
     private static String savedPassword = "admin123"; // Default password
     private UserManager userManager;
-    private Connection connection;
+    private AuthenticationService authenticationService;
+    private static Connection connection;
     
     public LoginPage(Connection connection) {
         this.connection = connection;
         this.userManager = new UserManager(connection);
+        this.authenticationService = new AuthenticationService(userManager);
         
         initComponents();
         setTitle("Nardo's Inventory System - Login");
@@ -130,8 +135,10 @@ public class LoginPage extends JFrame {
                 return;
             }
             
-            // Authenticate user
-            User authenticatedUser = userManager.authenticate(username, password);
+            // Use AuthenticationService for login with account lockout protection
+            // SRS 1.1.1: Credential validation
+            // SRS 1.1.4: Account lockout after 3 failed attempts
+            User authenticatedUser = authenticationService.authenticate(username, password);
             
             if (authenticatedUser != null) {
                 JOptionPane.showMessageDialog(this, 
@@ -147,10 +154,7 @@ public class LoginPage extends JFrame {
                 
                 dispose(); // Close login window
             } else {
-                JOptionPane.showMessageDialog(this, 
-                    "Invalid username or password", 
-                    "Authentication Failed", 
-                    JOptionPane.ERROR_MESSAGE);
+                // AuthenticationService handles error messages and account lockout
                 passField.setText("");
             }
         });
@@ -232,23 +236,35 @@ public class LoginPage extends JFrame {
     
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            Connection connection = null; // For testing, use null for mock mode
-            
-            // Uncomment below for database connection in production:
-            /*
+            Connection connection = null;
+
             try {
-                String url = "jdbc:mysql://localhost:3306/nardos_inventory";
-                String user = "root";
-                String password = "password";
-                connection = DriverManager.getConnection(url, user, password);
+                // Try to get connection from DBManager
+                connection = database.DBManager.getConnection();
+                
+                if (connection == null) {
+                    System.out.println("Running in TEST MODE - Database connection unavailable");
+                    JOptionPane.showMessageDialog(null,
+                        "Database connection failed.\n\n" +
+                        "Running in TEST MODE with mock data.\n\n" +
+                        "Test Credentials:\n" +
+                        "• Owner: username=owner1, password=validPwd\n" +
+                        "• Staff: username=staff1, password=staffPwd",
+                        "Database Connection Failed",
+                        JOptionPane.INFORMATION_MESSAGE);
+                }
             } catch (SQLException e) {
-                e.printStackTrace();
+                System.err.println("Database connection error: " + e.getMessage());
+                System.out.println("Running in TEST MODE - Database connection unavailable");
                 JOptionPane.showMessageDialog(null,
-                    "Database connection failed. Running in test mode.",
-                    "Database Error",
-                    JOptionPane.WARNING_MESSAGE);
+                    "Database connection failed.\n\n" +
+                    "Running in TEST MODE with mock data.\n\n" +
+                    "Test Credentials:\n" +
+                    "• Owner: username=owner1, password=validPwd\n" +
+                    "• Staff: username=staff1, password=staffPwd",
+                    "Database Connection Failed",
+                    JOptionPane.INFORMATION_MESSAGE);
             }
-            */
             
             LoginPage loginPage = new LoginPage(connection);
             loginPage.setVisible(true);
